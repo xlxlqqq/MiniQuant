@@ -7,7 +7,7 @@ from MiniQuant.layers.layer import QuantizedLinear
 def test_quantized_linear_shape():
     layer = QuantizedLinear(in_features=16, out_features=32)
 
-    layer.quantize_weight()
+    layer.quantize_weight_per_tensor()
 
     x = torch.randn(4, 16)
 
@@ -25,7 +25,7 @@ def test_quantized_linear_close_to_fp():
 
     y_fp = F.linear(x, layer.weight, layer.bias)
 
-    layer.quantize_weight()
+    layer.quantize_weight_per_tensor()
 
     y_q = layer(x)
 
@@ -37,7 +37,7 @@ def test_quantized_linear_close_to_fp():
 def test_quantized_weight_dtype():
     layer = QuantizedLinear(in_features=16, out_features=32)
 
-    layer.quantize_weight()
+    layer.quantize_weight_per_tensor()
 
     assert layer.weight_q.q.dtype == torch.int8
 

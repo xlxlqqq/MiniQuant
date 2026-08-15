@@ -7,6 +7,13 @@ from MiniQuant.quant.affine import (
     QuantizedTensor,
 )
 
+from MiniQuant.quant.per_channel import (
+    PerChannelQuantizedTensor,
+    symmetric_quantize_per_channel_int8,
+    symmetric_dequantize_per_channel_int8,
+)
+
+
 class QuantizedLinear(nn.Module):
     def __init__(
         self,
@@ -50,10 +57,20 @@ class QuantizedLinear(nn.Module):
         if self.bias is not None:
             nn.init.zeros_(self.bias)
     
-    def quantize_weight(self):
+    def quantize_weight_per_tensor(self):
         # 量化权重参数，并将结果存储在 self.weight_quantized 中
         # detach() 方法用于创建一个新的张量，该张量与原始张量共享相同的数据，但不会计算梯度。
+        # per tensor 量化
         self.weight_q = symmetric_quantize_int8(self.weight.detach())
+    
+    # per channel 量化
+    def quantize_weight_per_channel(self):
+        self.weight_q_channel = (
+            symmetric_quantize_per_channel_int8(
+                self.weight.detach(),
+                channel_dim=0,
+            )
+        )
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.weight_q is None:
