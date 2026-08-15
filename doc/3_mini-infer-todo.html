@@ -1,0 +1,2087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini-Infer 项目 TODO — MUSA + Qwen3-8B</title>
+<style>
+  /* ========== 基础变量 ========== */
+  :root {
+    --bg: #0d1117;
+    --bg-soft: #161b22;
+    --bg-card: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --accent-3: #f0883e;
+    --accent-4: #d2a8ff;
+    --accent-5: #ff7b72;
+    --accent-6: #ffd700;
+    --shadow: 0 4px 24px rgba(0,0,0,.4);
+    --radius: 12px;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    --sans: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+
+  /* ========== 全局 ========== */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:80px; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:var(--sans); line-height:1.7;
+    overflow-x:hidden;
+  }
+  ::selection { background:var(--accent); color:#000; }
+
+  /* ========== 顶部导航条 ========== */
+  .topbar {
+    position:fixed; top:0; left:0; right:0; z-index:1000;
+    height:60px; background:rgba(13,17,23,.92);
+    backdrop-filter:blur(12px); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 32px;
+  }
+  .topbar .logo {
+    font-size:18px; font-weight:700; color:var(--accent);
+    letter-spacing:.5px; display:flex; align-items:center; gap:10px;
+  }
+  .topbar .logo .dot {
+    width:10px; height:10px; border-radius:50%;
+    background:var(--accent-2); box-shadow:0 0 8px var(--accent-2);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .topbar .meta { font-size:13px; color:var(--text-dim); font-family:var(--mono); }
+
+  /* ========== 布局 ========== */
+  .layout {
+    display:grid;
+    grid-template-columns: 280px 1fr;
+    gap:0;
+    margin-top:60px;
+    min-height:calc(100vh - 60px);
+  }
+
+  /* ========== 左侧目录 ========== */
+  .sidebar {
+    position:sticky; top:60px;
+    height:calc(100vh - 60px);
+    overflow-y:auto;
+    background:var(--bg-soft);
+    border-right:1px solid var(--border);
+    padding:24px 0;
+  }
+  .sidebar::-webkit-scrollbar { width:4px; }
+  .sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .sidebar-title {
+    padding:0 24px 16px; font-size:12px; font-weight:700;
+    color:var(--text-dim); text-transform:uppercase; letter-spacing:1.5px;
+  }
+  .nav-item {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 24px; cursor:pointer;
+    font-size:14px; color:var(--text-dim);
+    border-left:3px solid transparent;
+    transition:all .2s;
+    user-select:none;
+  }
+  .nav-item:hover { color:var(--text); background:rgba(88,166,255,.06); }
+  .nav-item.active {
+    color:var(--accent); border-left-color:var(--accent);
+    background:rgba(88,166,255,.1);
+  }
+  .nav-item .num {
+    width:22px; height:22px; border-radius:6px;
+    background:var(--bg-card); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-family:var(--mono); font-weight:700;
+    flex-shrink:0;
+  }
+  .nav-item.active .num { background:var(--accent); color:#000; border-color:var(--accent); }
+  .nav-item.done .num { background:var(--accent-2); color:#000; border-color:var(--accent-2); }
+  .nav-item.done { color:var(--accent-2); }
+
+  .nav-sub {
+    padding-left:56px; font-size:12.5px;
+    color:var(--text-dim); margin-top:2px;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .nav-sub a {
+    color:var(--text-dim); text-decoration:none;
+    padding:3px 0; transition:color .2s;
+  }
+  .nav-sub a:hover { color:var(--accent); }
+
+  .sidebar-footer {
+    padding:16px 24px; margin-top:16px;
+    border-top:1px solid var(--border);
+    font-size:12px; color:var(--text-dim);
+  }
+
+  /* ========== 主内容区 ========== */
+  .main {
+    padding:40px 56px 80px;
+    max-width:960px;
+  }
+
+  /* ========== 标题区 ========== */
+  .hero {
+    margin-bottom:48px;
+    padding:32px;
+    background:linear-gradient(135deg, rgba(88,166,255,.08), rgba(126,231,135,.05));
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+  }
+  .hero h1 {
+    font-size:32px; font-weight:800;
+    background:linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    margin-bottom:12px;
+  }
+  .hero p { color:var(--text-dim); font-size:15px; }
+  .hero .tags { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .tag {
+    padding:4px 12px; border-radius:20px; font-size:12px;
+    font-family:var(--mono); font-weight:600;
+    border:1px solid var(--border);
+  }
+  .tag.blue { background:rgba(88,166,255,.15); color:var(--accent); border-color:rgba(88,166,255,.3); }
+  .tag.green { background:rgba(126,231,135,.15); color:var(--accent-2); border-color:rgba(126,231,135,.3); }
+  .tag.orange { background:rgba(240,136,62,.15); color:var(--accent-3); border-color:rgba(240,136,62,.3); }
+  .tag.purple { background:rgba(210,168,255,.15); color:var(--accent-4); border-color:rgba(210,168,255,.3); }
+
+  /* ========== 进度条 ========== */
+  .progress-wrap {
+    margin:24px 0 40px;
+  }
+  .progress-bar {
+    height:8px; background:var(--bg-card); border-radius:4px;
+    overflow:hidden; border:1px solid var(--border);
+  }
+  .progress-fill {
+    height:100%; width:0%;
+    background:linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius:4px; transition:width .6s ease;
+  }
+  .progress-text {
+    display:flex; justify-content:space-between;
+    font-size:13px; color:var(--text-dim); margin-top:8px;
+    font-family:var(--mono);
+  }
+
+  /* ========== 阶段卡片 ========== */
+  .phase {
+    margin-bottom:56px;
+    scroll-margin-top:80px;
+  }
+  .phase-header {
+    display:flex; align-items:center; gap:16px;
+    margin-bottom:24px; padding-bottom:16px;
+    border-bottom:2px solid var(--border);
+  }
+  .phase-num {
+    width:48px; height:48px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; font-weight:800; font-family:var(--mono);
+    flex-shrink:0;
+  }
+  .phase-num.blue { background:rgba(88,166,255,.2); color:var(--accent); border:2px solid var(--accent); }
+  .phase-num.green { background:rgba(126,231,135,.2); color:var(--accent-2); border:2px solid var(--accent-2); }
+  .phase-num.orange { background:rgba(240,136,62,.2); color:var(--accent-3); border:2px solid var(--accent-3); }
+  .phase-num.purple { background:rgba(210,168,255,.2); color:var(--accent-4); border:2px solid var(--accent-4); }
+  .phase-num.red { background:rgba(255,123,114,.2); color:var(--accent-5); border:2px solid var(--accent-5); }
+  .phase-num.gold { background:rgba(255,215,0,.2); color:var(--accent-6); border:2px solid var(--accent-6); }
+
+  .phase-title h2 { font-size:22px; font-weight:700; }
+  .phase-title p { font-size:14px; color:var(--text-dim); margin-top:4px; }
+
+  /* ========== 步骤卡片 ========== */
+  .step {
+    background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:24px;
+    margin-bottom:20px;
+    transition:border-color .3s, transform .2s;
+  }
+  .step:hover { border-color:rgba(88,166,255,.4); }
+  .step-header {
+    display:flex; align-items:center; gap:12px;
+    margin-bottom:16px;
+  }
+  .step-check {
+    width:24px; height:24px; border-radius:6px;
+    border:2px solid var(--border); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .2s; flex-shrink:0;
+  }
+  .step-check:hover { border-color:var(--accent); }
+  .step-check.checked {
+    background:var(--accent-2); border-color:var(--accent-2);
+  }
+  .step-check.checked::after { content:'✓'; color:#000; font-weight:700; font-size:14px; }
+  .step-title { font-size:16px; font-weight:700; }
+  .step-time {
+    margin-left:auto; font-size:12px; color:var(--text-dim);
+    font-family:var(--mono); padding:2px 8px;
+    background:var(--bg-soft); border-radius:4px;
+  }
+
+  .step-body h4 {
+    font-size:13px; color:var(--accent); margin:16px 0 8px;
+    text-transform:uppercase; letter-spacing:1px;
+  }
+  .step-body p, .step-body li {
+    font-size:14px; color:var(--text-dim); line-height:1.8;
+  }
+  .step-body ul { padding-left:20px; }
+  .step-body li { margin-bottom:6px; }
+
+  /* ========== 代码块 ========== */
+  .code-block {
+    background:#0a0e14; border:1px solid var(--border);
+    border-radius:8px; padding:16px 20px;
+    font-family:var(--mono); font-size:13px;
+    line-height:1.6; color:#c9d1d9;
+    overflow-x:auto; margin:12px 0;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .code-block .kw { color:#ff7b72; }
+  .code-block .str { color:#a5d6ff; }
+  .code-block .com { color:#8b949e; font-style:italic; }
+  .code-block .fn { color:#d2a8ff; }
+  .code-block .num { color:#79c0ff; }
+
+  /* ========== 验收标准 ========== */
+  .acceptance {
+    background:rgba(126,231,135,.06);
+    border:1px solid rgba(126,231,135,.25);
+    border-radius:8px; padding:16px 20px;
+    margin-top:16px;
+  }
+  .acceptance h4 {
+    color:var(--accent-2) !important; font-size:13px !important;
+    margin-bottom:10px !important;
+  }
+  .acceptance ul { padding-left:18px; }
+  .acceptance li {
+    color:var(--text) !important; font-size:13.5px !important;
+    margin-bottom:6px !important;
+  }
+  .acceptance .metric {
+    font-family:var(--mono); color:var(--accent-6);
+    background:rgba(255,215,0,.1); padding:1px 6px; border-radius:3px;
+  }
+
+  /* ========== 提示框 ========== */
+  .tip {
+    background:rgba(88,166,255,.06);
+    border-left:3px solid var(--accent);
+    padding:12px 16px; margin:12px 0;
+    border-radius:0 8px 8px 0;
+    font-size:13.5px; color:var(--text-dim);
+  }
+  .tip strong { color:var(--accent); }
+  .warn {
+    background:rgba(240,136,62,.06);
+    border-left:3px solid var(--accent-3);
+    padding:12px 16px; margin:12px 0;
+    border-radius:0 8px 8px 0;
+    font-size:13.5px; color:var(--text-dim);
+  }
+  .warn strong { color:var(--accent-3); }
+
+  /* ========== 文件树 ========== */
+  .file-tree {
+    background:var(--bg-soft); border:1px solid var(--border);
+    border-radius:8px; padding:16px 20px;
+    font-family:var(--mono); font-size:13px;
+    line-height:2; color:var(--text-dim);
+    margin:12px 0;
+  }
+  .file-tree .dir { color:var(--accent); font-weight:600; }
+  .file-tree .file { color:var(--text); }
+  .file-tree .comment { color:#6e7681; font-style:italic; }
+
+  /* ========== 表格 ========== */
+  .tbl {
+    width:100%; border-collapse:collapse;
+    font-size:13px; margin:12px 0;
+  }
+  .tbl th {
+    background:var(--bg-soft); color:var(--accent);
+    padding:10px 14px; text-align:left;
+    border:1px solid var(--border); font-weight:600;
+  }
+  .tbl td {
+    padding:10px 14px; border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .tbl tr:hover td { background:rgba(88,166,255,.04); }
+
+  /* ========== 底部 ========== */
+  .footer {
+    margin-top:64px; padding:32px;
+    text-align:center; color:var(--text-dim);
+    font-size:13px; border-top:1px solid var(--border);
+  }
+
+  /* ========== 打印 ========== */
+  @media print {
+    .sidebar, .topbar { display:none; }
+    .layout { grid-template-columns:1fr; }
+    .main { padding:20px; }
+    body { background:#fff; color:#000; }
+  }
+
+  /* ========== 复选框状态持久化提示 ========== */
+  .check-all-bar {
+    position:fixed; bottom:24px; right:24px; z-index:999;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .fab {
+    width:48px; height:48px; border-radius:50%;
+    background:var(--accent); color:#000;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; font-weight:700; cursor:pointer;
+    box-shadow:var(--shadow); transition:transform .2s;
+    border:none;
+  }
+  .fab:hover { transform:scale(1.1); }
+  .fab-label {
+    background:var(--bg-card); border:1px solid var(--border);
+    padding:6px 12px; border-radius:8px; font-size:12px;
+    color:var(--text-dim); text-align:center;
+    box-shadow:var(--shadow);
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 顶部条 ==================== -->
+<div class="topbar">
+  <div class="logo"><div class="dot"></div> mini-infer · MUSA TODO</div>
+  <div class="meta">Qwen3-8B · PyTorch · TileLang-MUSA · vllm-musa</div>
+</div>
+
+<!-- ==================== 布局 ==================== -->
+<div class="layout">
+
+  <!-- ========== 左侧目录 ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-title">📋 项目导航</div>
+
+    <div class="nav-item active" data-target="phase0">
+      <span class="num">0</span> 环境准备 & 基线
+    </div>
+    <div class="nav-sub">
+      <a href="#p0s1">0.1 确认 MUSA 环境</a>
+      <a href="#p0s2">0.2 跑通 HF 基线</a>
+      <a href="#p0s3">0.3 建立 benchmark 脚本</a>
+    </div>
+
+    <div class="nav-item" data-target="phase1">
+      <span class="num">1</span> KV Cache 手写
+    </div>
+    <div class="nav-sub">
+      <a href="#p1s1">1.1 理解 KV Cache 原理</a>
+      <a href="#p1s2">1.2 实现手动 KV Cache</a>
+      <a href="#p1s3">1.3 验证正确性</a>
+    </div>
+
+    <div class="nav-item" data-target="phase2">
+      <span class="num">2</span> Continuous Batching
+    </div>
+    <div class="nav-sub">
+      <a href="#p2s1">2.1 理解调度器</a>
+      <a href="#p2s2">2.2 实现动态 batch 调度</a>
+      <a href="#p2s3">2.3 测试多请求并发</a>
+    </div>
+
+    <div class="nav-item" data-target="phase3">
+      <span class="num">3</span> Paged KV Cache
+    </div>
+    <div class="nav-sub">
+      <a href="#p3s1">3.1 理解 PagedAttention</a>
+      <a href="#p3s2">3.2 实现 Block 分配器</a>
+      <a href="#p3s3">3.3 重写 Attention 为 Paged</a>
+    </div>
+
+    <div class="nav-item" data-target="phase4">
+      <span class="num">4</span> Chunked Prefill
+    </div>
+    <div class="nav-sub">
+      <a href="#p4s1">4.1 理解 Chunked Prefill</a>
+      <a href="#p4s2">4.2 实现分块 prefill</a>
+      <a href="#p4s3">4.3 测 TTFT 改善</a>
+    </div>
+
+    <div class="nav-item" data-target="phase5">
+      <span class="num">5</span> 吞吐对标 & 调优
+    </div>
+    <div class="nav-sub">
+      <a href="#p5s1">5.1 对标 HF Transformers</a>
+      <a href="#p5s2">5.2 性能剖析 & 瓶颈定位</a>
+    </div>
+
+    <div class="nav-item" data-target="phase6">
+      <span class="num">6</span> TileLang-MUSA Kernel
+    </div>
+    <div class="nav-sub">
+      <a href="#p6s1">6.1 环境 & 文档</a>
+      <a href="#p6s2">6.2 写 RMSNorm Kernel</a>
+      <a href="#p6s3">6.3 替换 & 测带宽</a>
+    </div>
+
+    <div class="nav-item" data-target="phase7">
+      <span class="num">7</span> vllm-musa PR
+    </div>
+    <div class="nav-sub">
+      <a href="#p7s1">7.1 找 Issue</a>
+      <a href="#p7s2">7.2 提 PR</a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div style="margin-bottom:6px;">💡 点击复选框可标记完成</div>
+      <div>📊 进度会自动保存到本地</div>
+    </div>
+  </aside>
+
+  <!-- ========== 主内容 ========== -->
+  <main class="main">
+
+    <!-- ===== 标题区 ===== -->
+    <div class="hero">
+      <h1>🚀 Mini-Infer 项目 TODO</h1>
+      <p>从零实现一个支持 KV Cache + Continuous Batching + Paged KV 的推理引擎，在 MUSA S5000 上跑通 Qwen3-8B，吞吐对标 HF Transformers 80%+，并替换 TileLang-MUSA kernel。</p>
+      <div class="tags">
+        <span class="tag blue">PyTorch</span>
+        <span class="tag green">Qwen3-8B</span>
+        <span class="tag orange">MUSA S5000</span>
+        <span class="tag purple">TileLang</span>
+        <span class="tag blue">vllm-musa</span>
+        <span class="tag green">KV Cache</span>
+        <span class="tag orange">PagedAttention</span>
+      </div>
+    </div>
+
+    <!-- ===== 进度条 ===== -->
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text">
+        <span id="progressLabel">0 / 0 步骤完成</span>
+        <span id="progressPct">0%</span>
+      </div>
+    </div>
+
+    <!-- ============================================= -->
+    <!-- ============ PHASE 0: 环境准备 ============ -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase0">
+      <div class="phase-header">
+        <div class="phase-num blue">0</div>
+        <div class="phase-title">
+          <h2>环境准备 & 建立基线</h2>
+          <p>先把 MUSA 环境摸清，跑通 HF Transformers 基线，建立 benchmark 脚本作为后续所有优化的对比锚点。</p>
+        </div>
+      </div>
+
+      <!-- Step 0.1 -->
+      <div class="step" id="p0s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">确认 MUSA 环境 & 工具链</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>确认驱动版本、musa-toolkit、mthreads-gmi 可用</li>
+            <li>确认 PyTorch-MUSA (torch_musa) 版本与 CUDA 兼容层</li>
+            <li>确认 Transformer Engine / 量化库是否可用</li>
+            <li>记录硬件规格：S5000 显存 / 带宽 / 算力</li>
+          </ul>
+
+          <h4>🛠 怎么做</h4>
+          <div class="code-block"><span class="com"># 检查 MUSA 驱动和工具链</span>
+mthreads-gmi topo
+mthreads-gmi --query-gpu=name,memory.total,driver_version --format=csv
+
+<span class="com"># 检查 torch_musa</span>
+python -c <span class="str">"import torch; import torch_musa; print(torch_musa.is_available())"</span>
+python -c <span class="str">"import torch; print(torch.version); print(torch_musa.get_device_properties(0))"</span>
+
+<span class="com"># 确认可用显存</span>
+python -c <span class="str">"import torch_musa; t=torch_musa.get_device_properties(0); print(f'Total: {t.total_memory/1e9:.1f}GB')"</span></div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/</span><br>
+├── <span class="file">env_check.py</span> <span class="comment"># 打印所有环境信息</span><br>
+├── <span class="file">requirements.txt</span> <span class="comment"># 依赖清单</span><br>
+└── <span class="dir">docs/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">musa_env.md</span> <span class="comment"># 环境记录</span>
+          </div>
+
+          <div class="tip">
+            <strong>提示：</strong>S5000 的显存如果是 32GB，Qwen3-8B FP16 约 16.4GB，KV Cache 留给 ~14GB，足够跑 batch=8+ 的长上下文测试。
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li><span class="metric">torch_musa.is_available() == True</span></li>
+              <li>能跑通一个简单的矩阵乘法 <span class="metric">A @ B</span> 在 MUSA 设备上</li>
+              <li>记录了 S5000 的 <span class="metric">total_memory / compute_capability / SM 数</span></li>
+              <li>写下一份 <span class="metric">musa_env.md</span>，包含驱动版本、toolkit 版本、torch_musa 版本</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 0.2 -->
+      <div class="step" id="p0s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">跑通 Qwen3-8B HF Transformers 基线</div>
+          <div class="step-time">⏱ 1 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>用 HuggingFace Transformers 原生加载 Qwen3-8B（FP16），在 MUSA 上跑通 generate()</li>
+            <li>确认 tokenizer、模型权重、config 全部正确</li>
+            <li>测试单请求 generate 正确性（与官方输出对比）</li>
+          </ul>
+
+          <h4>🛠 怎么做</h4>
+          <div class="code-block"><span class="com"># 安装依赖</span>
+pip install transformers accelerate sentencepiece tiktoken
+
+<span class="com"># 测试脚本 baseline_generate.py</span>
+<span class="kw">import</span> torch
+<span class="kw">import</span> torch_musa
+<span class="kw">from</span> transformers <span class="kw">import</span> AutoModelForCausalLM, AutoTokenizer
+
+model_name = <span class="str">"Qwen/Qwen3-8B"</span>
+device = <span class="str">"musa"</span>
+
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    torch_dtype=torch.float16,
+    device_map=device,
+).eval()
+
+prompt = <span class="str">"请用 Python 实现一个快速排序："</span>
+inputs = tokenizer(prompt, return_tensors=<span class="str">"pt"</span>).to(device)
+outputs = model.generate(
+    **inputs,
+    max_new_tokens=<span class="num">256</span>,
+    do_sample=<span class="kw">False</span>,          <span class="com"># 贪心，保证可复现</span>
+    pad_token_id=tokenizer.eos_token_id,
+)
+print(tokenizer.decode(outputs[<span class="num">0</span>], skip_special_tokens=<span class="kw">True</span>))</div>
+
+          <div class="warn">
+            <strong>注意：</strong>如果 Qwen3-8B 直接用 device_map="musa" 报错，试试用 <code>device_map="auto"</code> 或手动 <code>model.to("musa")</code>。确认 torch_musa 的 device 字符串是 <code>"musa"</code> 还是 <code>"mtgpu"</code>。
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>模型加载成功，显存占用约 <span class="metric">16.4 GB</span>（FP16）</li>
+              <li>generate 输出通顺、代码可运行（人工判断）</li>
+              <li>贪心解码输出 <strong>完全确定性</strong>（同一 prompt 两次结果一致）</li>
+              <li>记录单请求 generate 的 <span class="metric">首 token 延迟 / 总耗时 / tok/s</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 0.3 -->
+      <div class="step" id="p0s3">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">建立 benchmark 脚本（对比锚点）</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>写一个统一 benchmark 脚本，后续每个阶段都用同一套数据对比</li>
+            <li>指标：TTFT、TPOT、tok/s（prefill + decode）、GPU 显存峰值</li>
+            <li>测试集：固定 100 条 prompt（长度 128~2048 混合）</li>
+          </ul>
+
+          <h4>🛠 怎么做</h4>
+          <div class="code-block"><span class="com"># benchmark_hf.py 核心结构</span>
+<span class="kw">import</span> time, statistics
+<span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass
+
+<span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="fn">BenchResult</span>:
+    ttft_ms: <span class="kw">float</span>      <span class="com"># Time To First Token</span>
+    tpot_ms: <span class="kw">float</span>      <span class="com"># Time Per Output Token</span>
+    tok_per_s: <span class="kw">float</span>
+    peak_mem_gb: <span class="kw">float</span>
+    num_tokens: <span class="kw">int</span>
+
+<span class="kw">def</span> <span class="fn">benchmark_hf</span>(model, tokenizer, prompts, max_new_tokens=<span class="num">256</span>):
+    results = []
+    <span class="kw">for</span> prompt <span class="kw">in</span> prompts:
+        inputs = tokenizer(prompt, return_tensors=<span class="str">"pt"</span>).to(<span class="str">"musa"</span>)
+        torch_musa.synchronize()
+
+        t0 = time.perf_counter()
+        outputs = model.generate(
+            **inputs, max_new_tokens=max_new_tokens,
+            do_sample=<span class="kw">False</span>, return_dict_in_generate=<span class="kw">True</span>,
+            output_scores=<span class="kw">True</span>,
+        )
+        torch_musa.synchronize()
+        t1 = time.perf_counter()
+
+        num_new = outputs.sequences.shape[<span class="num">1</span>] - inputs.input_ids.shape[<span class="num">1</span>]
+        elapsed = t1 - t0
+        results.append(BenchResult(
+            ttft_ms=..., tpot_ms=(elapsed*<span class="num">1000</span>)/num_new,
+            tok_per_s=num_new/elapsed,
+            peak_mem_gb=torch_musa.max_memory_allocated(<span class="num">0</span>)/<span class="num">1e9</span>,
+            num_tokens=num_new,
+        ))
+    <span class="kw">return</span> results</div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/</span><br>
+├── <span class="file">benchmark_hf.py</span> <span class="comment"># HF 基线 benchmark</span><br>
+├── <span class="file">prompts.jsonl</span> <span class="comment"># 100 条固定 prompt</span><br>
+├── <span class="dir">results/</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">baseline_hf.json</span> <span class="comment"># 基线数据</span>
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>用同一组 100 条 prompt 跑出基线数据，保存为 JSON</li>
+              <li>记录 <span class="metric">mean / p50 / p95 / p99</span> 的 TTFT 和 TPOT</li>
+              <li>记录峰值显存 <span class="metric">peak_mem_gb</span></li>
+              <li>这是后续所有优化的 <strong>唯一对比锚点</strong></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ======== PHASE 1: KV Cache 手写 ========= -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase1">
+      <div class="phase-header">
+        <div class="phase-num green">1</div>
+        <div class="phase-title">
+          <h2>手写 KV Cache（不重算）</h2>
+          <p>理解并手动实现 KV Cache 机制，让 decode 阶段不再重算 prefix 的 attention，这是推理引擎最基础的加速手段。</p>
+        </div>
+      </div>
+
+      <!-- Step 1.1 -->
+      <div class="step" id="p1s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">理解 KV Cache 原理</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>搞懂为什么 decode 时每个新 token 要重算所有历史 KV 是 O(n²)</li>
+            <li>理解 prefill 阶段一次性算完所有 KV，decode 阶段只算新 token 的 KV 并 append</li>
+            <li>画出 KV Cache 的内存布局图（每层、每头、seq_len 维度）</li>
+          </ul>
+
+          <h4>🧠 核心公式</h4>
+          <div class="code-block"><span class="com"># 标准 attention (无 cache)</span>
+Q = X @ W_q  <span class="com"># (1, seq, dim)</span>
+K = X @ W_k  <span class="com"># (1, seq, dim)</span>
+V = X @ W_v  <span class="com"># (1, seq, dim)</span>
+scores = Q @ K.T / sqrt(d_head)  <span class="com"># (1, seq, seq) — 每步都重算！</span>
+out = softmax(scores) @ V
+
+<span class="com"># 有 KV Cache 后 (decode 阶段)</span>
+K_cache = [K_0, K_1, ..., K_{t-1}]  <span class="com"># 已缓存</span>
+K_new = x_t @ W_k  <span class="com"># 只算当前步</span>
+K = concat(K_cache, K_new)  <span class="com"># (1, t+1, dim)</span>
+<span class="com"># Q 也只有当前步 (1, 1, dim)，attention 是 (1, 1, t+1)</span></div>
+
+          <table class="tbl">
+            <tr><th>阶段</th><th>Q 形状</th><th>K/V 形状</th><th>计算量</th></tr>
+            <tr><td>Prefill</td><td>(1, S, D)</td><td>(1, S, D)</td><td>O(S²D)</td></tr>
+            <tr><td>Decode (无 cache)</td><td>(1, 1, D)</td><td>(1, S, D) 重算</td><td>O(SD) 每步</td></tr>
+            <tr><td>Decode (有 cache)</td><td>(1, 1, D)</td><td>append 到 cache</td><td>O(SD) 但 KV 不重算</td></tr>
+          </table>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>能在白板上画出 <strong>prefill → decode → decode → ...</strong> 的 KV Cache 数据流</li>
+              <li>能解释为什么 cache 后 decode 是 <span class="metric">memory-bound</span> 而非 compute-bound</li>
+              <li>写下一份笔记 <span class="metric">kv_cache_notes.md</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1.2 -->
+      <div class="step" id="p1s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">实现手动 KV Cache 推理</div>
+          <div class="step-time">⏱ 2 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>不用 model.generate()，自己写 forward loop</li>
+            <li>Prefill 阶段：一次性算完所有 prompt token 的 KV，存入 cache</li>
+            <li>Decode 阶段：每步只前向 1 个 token，从 cache 读历史 KV，append 新 KV</li>
+            <li>Cache 形状：<span class="metric">(num_layers, 2, batch, num_heads, max_seq, head_dim)</span></li>
+          </ul>
+
+          <h4>🛠 怎么做</h4>
+          <div class="code-block"><span class="com"># mini_infer/kv_cache.py</span>
+<span class="kw">import</span> torch
+
+<span class="kw">class</span> <span class="fn">KVCache</span>:
+    <span class="str">"""手动 KV Cache，预分配最大长度"""</span>
+    <span class="kw">def</span> __init__(self, num_layers, num_heads, max_seq, head_dim, dtype=torch.float16, device=<span class="str">"musa"</span>):
+        self.num_layers = num_layers
+        self.max_seq = max_seq
+        self.device = device
+        <span class="com"># (L, 2, num_heads, max_seq, head_dim)</span>
+        self.k = torch.zeros(num_layers, num_heads, max_seq, head_dim, dtype=dtype, device=device)
+        self.v = torch.zeros(num_layers, num_heads, max_seq, head_dim, dtype=dtype, device=device)
+        self.seq_len = <span class="num">0</span>  <span class="com"># 当前已缓存长度</span>
+
+    <span class="kw">def</span> <span class="fn">update</span>(self, layer_idx, k_new, v_new):
+        <span class="str">"""k_new: (num_heads, 1, head_dim) — decode 阶段"""</span>
+        s = self.seq_len
+        self.k[layer_idx, :, s] = k_new.squeeze(<span class="num">1</span>)
+        self.v[layer_idx, :, s] = v_new.squeeze(<span class="num">1</span>)
+        self.seq_len += <span class="num">1</span>
+
+    <span class="kw">def</span> <span class="fn">get_kv</span>(self, layer_idx):
+        <span class="str">"""返回当前所有缓存的 KV"""</span>
+        s = self.seq_len
+        <span class="kw">return</span> self.k[layer_idx, :, :s], self.v[layer_idx, :, :s]</div>
+
+          <div class="code-block"><span class="com"># mini_infer/forward.py — 手动 decode loop</span>
+<span class="kw">def</span> <span class="fn">generate_with_cache</span>(model, tokenizer, prompt, max_new=<span class="num">256</span>):
+    <span class="com"># === Prefill ===</span>
+    input_ids = tokenizer(prompt, return_tensors=<span class="str">"pt"</span>).input_ids.to(<span class="str">"musa"</span>)
+    cache = KVCache(
+        num_layers=model.config.num_hidden_layers,
+        num_heads=model.config.num_attention_heads,
+        max_seq=input_ids.shape[<span class="num">1</span>] + max_new,
+        head_dim=model.config.hidden_size // model.config.num_attention_heads,
+    )
+
+    <span class="com"># 手动逐层 forward (prefill)</span>
+    hidden = model.embed(input_ids)  <span class="com"># 伪代码，实际要调各层</span>
+    <span class="kw">for</span> i, layer <span class="kw">in</span> enumerate(model.layers):
+        q, k, v = layer.attn.qkv(hidden)
+        <span class="com"># reshape to (num_heads, seq, head_dim)</span>
+        cache.k[i, :, :k.shape[<span class="num">1</span>]] = k
+        cache.v[i, :, :v.shape[<span class="num">1</span>]] = v
+        cache.seq_len = k.shape[<span class="num">1</span>]
+        <span class="com"># attention with full KV</span>
+        hidden = layer.attn.output(hidden, cache.get_kv(i))
+        hidden = layer.mlp(hidden)
+
+    <span class="com"># === Decode loop ===</span>
+    next_token = sample(model.lm_head(hidden[:, -<span class="num">1</span>]))
+    output_ids = [next_token.item()]
+    <span class="kw">for</span> _ <span class="kw">in</span> range(max_new - <span class="num">1</span>):
+        hidden = model.embed(next_token.unsqueeze(<span class="num">0</span>))
+        <span class="kw">for</span> i, layer <span class="kw">in</span> enumerate(model.layers):
+            q, k, v = layer.attn.qkv(hidden)  <span class="com"># k,v: (1, 1, dim)</span>
+            cache.update(i, k, v)
+            kv_k, kv_v = cache.get_kv(i)
+            hidden = layer.attn.output(hidden, (kv_k, kv_v))
+            hidden = layer.mlp(hidden)
+        logits = model.lm_head(hidden[:, -<span class="num">1</span>])
+        next_token = sample(logits)
+        output_ids.append(next_token.item())
+
+    <span class="kw">return</span> output_ids</div>
+
+          <div class="warn">
+            <strong>难点：</strong>Qwen3 用的是 <strong>RMSNorm + RoPE + GQA</strong>（grouped-query attention），K/V 的头数可能少于 Q 的头数。cache 只缓存 K/V 的实际头数，attention 时再 repeat 或 broadcast。
+          </div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/</span><br>
+├── <span class="dir">mini_infer/</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">__init__.py</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">kv_cache.py</span> <span class="comment"># KVCache 类</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">model.py</span> <span class="comment"># 手动拆解 Qwen3 各层</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">forward.py</span> <span class="comment"># prefill + decode loop</span><br>
+│&nbsp;&nbsp;&nbsp;└── <span class="file">sampling.py</span> <span class="comment"># greedy / top-k / top-p</span><br>
+├── <span class="file">test_kv_cache.py</span> <span class="comment"># 正确性验证</span><br>
+└── <span class="file">benchmark_kv.py</span> <span class="comment"># KV Cache 版 benchmark</span>
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>输出与 HF generate() 贪心解码 <strong>逐 token 一致</strong>（这是硬性要求）</li>
+              <li>decode 阶段不再重算历史 KV（用 <span class="metric">torch.profiler</span> 验证计算量下降）</li>
+              <li>长序列（2048 token）decode 速度比无 cache 快 <span class="metric">≥ 3×</span></li>
+              <li>显存中 KV Cache 占用可预测：<span class="metric">2 × L × H × max_seq × head_dim × 2 bytes</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1.3 -->
+      <div class="step" id="p1s3">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">验证正确性 & 跑 benchmark</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>用同一组 prompt 对比 HF generate 和你的 KV Cache 实现</li>
+            <li>确认输出完全一致（greedy）或统计一致（sampling with seed）</li>
+            <li>跑 benchmark，记录加速比</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># test_correctness.py</span>
+<span class="kw">def</span> <span class="fn">test_greedy_match</span>():
+    prompt = <span class="str">"解释一下量子纠缠："</span>
+    <span class="com"># HF 输出</span>
+    hf_out = hf_generate(prompt, max_new=<span class="num">128</span>, do_sample=<span class="kw">False</span>)
+    <span class="com"># 我们的输出</span>
+    our_out = generate_with_cache(model, tokenizer, prompt, max_new=<span class="num">128</span>)
+
+    match = hf_out == our_out
+    print(<span class="str">f"Token match rate: {match.count(True)/len(match)*100:.2f}%"</span>)
+    <span class="kw">assert</span> all(match), <span class="str">"输出不一致！检查 RoPE / cache 逻辑"</span></div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>贪心解码下 <span class="metric">token-level 完全一致率 = 100%</span></li>
+              <li>decode 吞吐比 HF generate 快 <span class="metric">≥ 2×</span>（因为避免了重复计算）</li>
+              <li>结果保存为 <span class="metric">results/kv_cache.json</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ===== PHASE 2: Continuous Batching ========= -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase2">
+      <div class="phase-header">
+        <div class="phase-num orange">2</div>
+        <div class="phase-title">
+          <h2>Continuous Batching（连续批处理）</h2>
+          <p>静态 batch 会等最慢的请求结束才能释放 batch，Continuous Batching 让每个 decode 步动态组 batch，吞吐可提升 3-5×。</p>
+        </div>
+      </div>
+
+      <!-- Step 2.1 -->
+      <div class="step" id="p2s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">理解 Continuous Batching 调度逻辑</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>搞懂为什么静态 batching 浪费：batch 中某个请求先结束，其余请求独占 batch slot</li>
+            <li>理解 iteration-level scheduling：每个 decode step 重新组 batch</li>
+            <li>理解 request 生命周期：WAITING → RUNNING → FINISHED</li>
+          </ul>
+
+          <table class="tbl">
+            <tr><th>策略</th><th>组 batch 时机</th><th>空闲等待</th><th>吞吐</th></tr>
+            <tr><td>静态 Batching</td><td>请求入队时</td><td>严重（等最长请求）</td><td>低</td></tr>
+            <tr><td>Dynamic Batching</td><td>每个 step</td><td>较少</td><td>中</td></tr>
+            <tr><td>Continuous Batching</td><td>每个 iteration</td><td>几乎无</td><td>高</td></tr>
+          </table>
+
+          <div class="code-block"><span class="com"># 调度状态机</span>
+<span class="kw">class</span> <span class="fn">RequestState</span>:
+    WAITING = <span class="str">"waiting"</span>      <span class="com"># 在队列中等待被调度</span>
+    RUNNING = <span class="str">"running"</span>      <span class="com"># 正在参与 decode</span>
+    FINISHED = <span class="str">"finished"</span>    <span class="com"># 生成结束（EOS / max_len）</span>
+
+<span class="com"># 每个 iteration:</span>
+<span class="com"># 1. 把 WAITING 中能塞进 batch 的请求提到 RUNNING</span>
+<span class="com"># 2. 对所有 RUNNING 请求做一次 forward</span>
+<span class="com"># 3. 采样、append token</span>
+<span class="com"># 4. 检查 EOS，FINISHED 的释放 slot</span></div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>能画出调度时序图：请求 A/B/C 在不同时间到达，batch 组成如何变化</li>
+              <li>理解 <span class="metric">max_num_seqs / max_tokens_per_batch</span> 两个约束</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2.2 -->
+      <div class="step" id="p2s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">实现 Continuous Batch 调度器 + 改造 forward</div>
+          <div class="step-time">⏱ 3 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>写一个 Scheduler 类，管理请求队列和 batch 组装</li>
+            <li>改造 forward：支持变长 batch（不同请求不同 seq_len），用 attention mask 隔离</li>
+            <li>每个 iteration 只对 RUNNING 请求做一步 decode</li>
+            <li>新请求随时可加入（模拟流式）</li>
+          </ul>
+
+          <h4>🛠 核心代码结构</h4>
+          <div class="code-block"><span class="com"># mini_infer/scheduler.py</span>
+<span class="kw">class</span> <span class="fn">Request</span>:
+    <span class="kw">def</span> __init__(self, req_id, prompt_ids, max_new_tokens):
+        self.req_id = req_id
+        self.prompt_ids = prompt_ids
+        self.output_ids = []
+        self.state = RequestState.WAITING
+        self.num_generated = <span class="num">0</span>
+        self.max_new_tokens = max_new_tokens
+
+<span class="kw">class</span> <span class="fn">Scheduler</span>:
+    <span class="kw">def</span> __init__(self, max_num_seqs=<span class="num">8</span>, max_total_tokens=<span class="num">16384</span>):
+        self.waiting: <span class="kw">list</span>[Request] = []
+        self.running: <span class="kw">list</span>[Request] = []
+        self.max_num_seqs = max_num_seqs
+        self.max_total_tokens = max_total_tokens
+
+    <span class="kw">def</span> <span class="fn">schedule</span>(self):
+        <span class="str">"""每个 iteration 调用，返回本步要跑的 batch"""</span>
+        <span class="com"># 1. 把 waiting 中能塞的塞进 running</span>
+        available = self.max_num_seqs - len(self.running)
+        <span class="kw">for</span> req <span class="kw">in</span> self.waiting[:available]:
+            total_tokens = sum(len(r.prompt_ids) + r.num_generated + <span class="num">1</span> <span class="kw">for</span> r <span class="kw">in</span> self.running + [req])
+            <span class="kw">if</span> total_tokens > self.max_total_tokens:
+                <span class="kw">break</span>
+            req.state = RequestState.RUNNING
+            self.running.append(req)
+            self.waiting.remove(req)
+
+        <span class="kw">return</span> self.running
+
+    <span class="kw">def</span> <span class="fn">post_step</span>(self, running_outputs):
+        <span class="str">"""处理本步输出，标记 finished"""</span>
+        <span class="kw">for</span> req, token <span class="kw">in</span> zip(self.running, running_outputs):
+            req.output_ids.append(token)
+            req.num_generated += <span class="num">1</span>
+            <span class="kw">if</span> token == EOS <span class="kw">or</span> req.num_generated >= req.max_new_tokens:
+                req.state = RequestState.FINISHED
+
+        <span class="com"># 清理 finished</span>
+        self.running = [r <span class="kw">for</span> r <span class="kw">in</span> self.running <span class="kw">if</span> r.state == RequestState.RUNNING]</div>
+
+          <div class="code-block"><span class="com"># mini_infer/engine.py — 主循环</span>
+<span class="kw">class</span> <span class="fn">MiniInferEngine</span>:
+    <span class="kw">def</span> __init__(self, model, tokenizer, scheduler):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.scheduler = scheduler
+        <span class="com"># 每个请求一个独立的 KV Cache slice</span>
+        self.caches: <span class="kw">dict</span>[<span class="kw">int</span>, KVCache] = {}
+
+    <span class="kw">def</span> <span class="fn">step</span>(self):
+        <span class="str">"""执行一个 iteration"""</span>
+        batch = self.scheduler.schedule()
+        <span class="kw">if</span> <span class="kw">not</span> batch:
+            <span class="kw">return</span> []
+
+        <span class="com"># 收集 batch 中每个请求的 last token</span>
+        input_ids = torch.stack([
+            torch.tensor(req.prompt_ids + req.output_ids, device=<span class="str">"musa"</span>)[-<span class="num">1</span>].unsqueeze(<span class="num">0</span>)
+            <span class="kw">for</span> req <span class="kw">in</span> batch
+        ], dim=<span class="num">0</span>)  <span class="com"># (B, 1)</span>
+
+        <span class="com"># 逐层 forward（batch 维度并行）</span>
+        hidden = self.model.embed(input_ids)
+        <span class="kw">for</span> i, layer <span class="kw">in</span> enumerate(self.model.layers):
+            q, k, v = layer.attn.qkv(hidden)
+            <span class="com"># 写入各自的 cache</span>
+            <span class="kw">for</span> b, req <span class="kw">in</span> enumerate(batch):
+                self.caches[req.req_id].update(i, k[b:b+<span class="num">1</span>], v[b:b+<span class="num">1</span>])
+            <span class="com"># 读取各自的 KV 做 attention</span>
+            <span class="com"># ... (需要处理变长 attention)</span>
+            hidden = layer.mlp(hidden)
+
+        logits = self.model.lm_head(hidden[:, -<span class="num">1</span>])
+        next_tokens = logits.argmax(dim=-<span class="num">1</span>)
+
+        self.scheduler.post_step(next_tokens.tolist())
+        <span class="kw">return</span> next_tokens.tolist()</div>
+
+          <div class="warn">
+            <strong>关键难点：</strong>变长 attention。batch 中不同请求的 KV Cache 长度不同，不能直接做统一矩阵乘法。方案：
+            <br>(1) pad 到同一长度 + attention mask（简单但浪费）
+            <br>(2) 用 FlashAttention 的 varlen 接口（高效但需要 kernel 支持）
+            <br>(3) 逐请求串行 attention 但 batch 矩阵乘（折中）
+          </div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/mini_infer/</span><br>
+├── <span class="file">scheduler.py</span> <span class="comment"># Request + Scheduler</span><br>
+├── <span class="file">engine.py</span> <span class="comment"># MiniInferEngine 主循环</span><br>
+├── <span class="file">batch_attn.py</span> <span class="comment"># 变长 batch attention</span><br>
+└── <span class="file">kv_cache.py</span> <span class="comment"># 改为支持多请求 slice</span>
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>能同时处理 <span class="metric">≥ 8 个</span>并发请求，正确性不变</li>
+              <li>新请求在任意 iteration 插入都能被正确调度</li>
+              <li>吞吐（总 tok/s）比单请求 KV Cache 版高 <span class="metric">≥ 3×</span></li>
+              <li>GPU 利用率（mthreads-gmi）在并发时 > <span class="metric">70%</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2.3 -->
+      <div class="step" id="p2s3">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">测试多请求并发 & 吞吐</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>模拟 16 个请求随机到达，测试调度器行为</li>
+            <li>对比静态 batch vs continuous batch 的吞吐</li>
+            <li>绘制吞吐-并发数曲线</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># test_concurrent.py</span>
+<span class="kw">import</span> random, time
+
+<span class="kw">def</span> <span class="fn">simulate_arrival</span>(engine, prompts, arrival_interval=<span class="num">0.1</span>):
+    <span class="str">"""模拟请求随机到达"""</span>
+    results = {}
+    <span class="kw">for</span> i, prompt <span class="kw">in</span> enumerate(prompts):
+        req_id = engine.submit(prompt, max_new_tokens=random.randint(<span class="num">128</span>,<span class="num">512</span>))
+        results[req_id] = {<span class="str">"prompt"</span>: prompt, <span class="str">"start"</span>: time.time()}
+        time.sleep(arrival_interval)
+
+    <span class="com"># 主循环</span>
+    <span class="kw">while</span> engine.has_pending():
+        engine.step()
+
+    <span class="kw">return</span> results</div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>Continuous batching 吞吐 > 静态 batching 吞吐 <span class="metric">× 2.5</span></li>
+              <li>所有请求输出正确（与单请求结果一致）</li>
+              <li>绘制 <span class="metric">并发数 vs 总吞吐</span> 曲线图</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ======= PHASE 3: Paged KV Cache ========== -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase3">
+      <div class="phase-header">
+        <div class="phase-num purple">3</div>
+        <div class="phase-title">
+          <h2>Paged KV Cache（类虚拟内存管理）</h2>
+          <p>用固定大小的 block 管理 KV Cache，消除碎片，支持任意长度序列的高效内存复用。这是 vLLM 的核心创新。</p>
+        </div>
+      </div>
+
+      <!-- Step 3.1 -->
+      <div class="step" id="p3s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">理解 PagedAttention 原理</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>理解传统 KV Cache 的内存碎片问题：不同请求长度不同 → 内部碎片 + 外部碎片</li>
+            <li>理解 block 化：把 KV Cache 切成固定大小 block（如每 block 16 token）</li>
+            <li>理解 block table：逻辑 block → 物理 block 的映射（类似 OS 页表）</li>
+            <li>理解 copy-on-write：多请求共享 prefix 时只复制 block 指针</li>
+          </ul>
+
+          <table class="tbl">
+            <tr><th>方案</th><th>内存利用率</th><th>碎片</th><th>共享 prefix</th></tr>
+            <tr><td>连续分配</td><td>~40-60%</td><td>严重</td><td>不支持</td></tr>
+            <tr><td>预分配最大</td><td>~30-50%</td><td>内部碎片</td><td>不支持</td></tr>
+            <tr><td>Paged (block=16)</td><td>> 95%</td><td>极少</td><td>支持 CoW</td></tr>
+          </table>
+
+          <div class="code-block"><span class="com"># Block 管理核心概念</span>
+NUM_BLOCKS = <span class="num">1024</span>       <span class="com"># 物理 block 总数</span>
+BLOCK_SIZE = <span class="num">16</span>         <span class="com"># 每 block 16 个 token</span>
+BLOCK_BYTES = <span class="num">2</span> * num_layers * num_kv_heads * BLOCK_SIZE * head_dim * <span class="num">2</span>
+
+<span class="com"># 每个请求维护一个 block_table: List[int]</span>
+<span class="com"># block_table[i] = 物理 block 编号，存第 i 个逻辑 block</span>
+<span class="com"># 逻辑 block 0 → 物理 block 42 → token 0~15 的 KV</span>
+<span class="com"># 逻辑 block 1 → 物理 block 7  → token 16~31 的 KV</span></div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>能画出 block table 映射图，解释逻辑地址 → 物理地址的转换</li>
+              <li>能解释为什么 PagedAttention 需要特殊 kernel（不能简单做矩阵乘）</li>
+              <li>理解 CoW（Copy-on-Write）如何支持 prefix caching</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3.2 -->
+      <div class="step" id="p3s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">实现 Block 分配器 & Block Table</div>
+          <div class="step-time">⏱ 2 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>实现物理 block 池：分配、释放、碎片整理</li>
+            <li>每个请求维护 block_table（逻辑 → 物理映射）</li>
+            <li>处理 block 满时的分配新 block 逻辑</li>
+            <li>处理请求结束时的 block 回收</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># mini_infer/block_allocator.py</span>
+<span class="kw">class</span> <span class="fn">BlockAllocator</span>:
+    <span class="kw">def</span> __init__(self, num_blocks, block_size, num_layers, num_kv_heads, head_dim, dtype=torch.float16, device=<span class="str">"musa"</span>):
+        self.num_blocks = num_blocks
+        self.block_size = block_size
+        self.free_blocks = <span class="kw">set</span>(range(num_blocks))
+        self.allocated = {}  <span class="com"># block_id → ref_count</span>
+
+        <span class="com"># 预分配所有物理 block 的 KV 存储</span>
+        <span class="com"># (num_blocks, 2[K/V], num_layers, num_kv_heads, block_size, head_dim)</span>
+        self.kv_pool = torch.zeros(
+            num_blocks, <span class="num">2</span>, num_layers, num_kv_heads, block_size, head_dim,
+            dtype=dtype, device=device
+        )
+
+    <span class="kw">def</span> <span class="fn">allocate</span>(self, num_blocks_needed) -> <span class="kw">list</span>[<span class="kw">int</span>]:
+        <span class="kw">if</span> len(self.free_blocks) < num_blocks_needed:
+            <span class="kw">raise</span> MemoryError(<span class="str">"Out of KV blocks!"</span>)
+        blocks = [self.free_blocks.pop() <span class="kw">for</span> _ <span class="kw">in</span> range(num_blocks_needed)]
+        <span class="kw">for</span> b <span class="kw">in</span> blocks:
+            self.allocated[b] = <span class="num">1</span>
+        <span class="kw">return</span> blocks
+
+    <span class="kw">def</span> <span class="fn">free</span>(self, block_ids: <span class="kw">list</span>[<span class="kw">int</span>]):
+        <span class="kw">for</span> bid <span class="kw">in</span> block_ids:
+            self.allocated[bid] -= <span class="num">1</span>
+            <span class="kw">if</span> self.allocated[bid] == <span class="num">0</span>:
+                <span class="kw">del</span> self.allocated[bid]
+                self.free_blocks.add(bid)
+
+    <span class="kw">def</span> <span class="fn">get_kv_slice</span>(self, block_id, kv_idx) -> torch.Tensor:
+        <span class="str">"""返回某 block 的 K 或 V 张量视图"""</span>
+        <span class="kw">return</span> self.kv_pool[block_id, kv_idx]  <span class="com"># (L, H, block_size, head_dim)</span></div>
+
+          <div class="code-block"><span class="com"># mini_infer/paged_kv.py</span>
+<span class="kw">class</span> <span class="fn">PagedKVCache</span>:
+    <span class="kw">def</span> __init__(self, allocator: BlockAllocator, req_id):
+        self.allocator = allocator
+        self.req_id = req_id
+        self.block_table: <span class="kw">list</span>[<span class="kw">int</span>] = []
+        self.num_tokens = <span class="num">0</span>
+
+    <span class="kw">def</span> <span class="fn">append</span>(self, k_new, v_new):
+        <span class="str">"""k_new: (num_layers, num_kv_heads, 1, head_dim)"""</span>
+        <span class="kw">if</span> self.num_tokens % self.allocator.block_size == <span class="num">0</span>:
+            <span class="com"># 需要新 block</span>
+            new_blocks = self.allocator.allocate(<span class="num">1</span>)
+            self.block_table.extend(new_blocks)
+
+        block_idx = self.num_tokens // self.allocator.block_size
+        offset = self.num_tokens % self.allocator.block_size
+        phys_block = self.block_table[block_idx]
+
+        <span class="com"># 写入物理存储</span>
+        self.allocator.kv_pool[phys_block, <span class="num">0</span>, :, :, offset] = k_new.squeeze(<span class="num">2</span>)
+        self.allocator.kv_pool[phys_block, <span class="num">1</span>, :, :, offset] = v_new.squeeze(<span class="num">2</span>)
+        self.num_tokens += <span class="num">1</span>
+
+    <span class="kw">def</span> <span class="fn">get_continuous_kv</span>(self, layer_idx) -> <span class="kw">tuple</span>[torch.Tensor, torch.Tensor]:
+        <span class="str">"""拼接所有 block 的 KV 为连续张量（用于 attention 计算）"""</span>
+        ks = []
+        vs = []
+        <span class="kw">for</span> bid <span class="kw">in</span> self.block_table:
+            ks.append(self.allocator.kv_pool[bid, <span class="num">0</span>, layer_idx])
+            vs.append(self.allocator.kv_pool[bid, <span class="num">1</span>, layer_idx])
+        <span class="kw">return</span> torch.cat(ks, dim=<span class="num">1</span>)[:self.num_tokens], torch.cat(vs, dim=<span class="num">1</span>)[:self.num_tokens]</div>
+
+          <div class="warn">
+            <strong>性能提示：</strong>get_continuous_kv 里的 torch.cat 会产生拷贝开销。生产级实现应该直接用 block_table 做 gather 或写 PagedAttention kernel。但作为教学版，先 cat 跑通正确性，后面再优化。
+          </div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/mini_infer/</span><br>
+├── <span class="file">block_allocator.py</span> <span class="comment"># 物理 block 池</span><br>
+├── <span class="file">paged_kv.py</span> <span class="comment"># PagedKVCache 类</span><br>
+├── <span class="file">paged_attention.py</span> <span class="comment"># 基于 block_table 的 attention</span><br>
+└── <span class="file">prefix_cache.py</span> <span class="comment"># CoW prefix 共享（可选）</span>
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>Block 分配/释放正确，无内存泄漏（长时间运行后 free_blocks 数量稳定）</li>
+              <li>不同长度请求混跑时，内存利用率 > <span class="metric">90%</span></li>
+              <li>输出与连续 KV Cache 版本逐 token 一致</li>
+              <li>支持的最大并发数显著提升（相比连续分配）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3.3 -->
+      <div class="step" id="p3s3">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">重写 Attention 为 Paged 版本 & 端到端测试</div>
+          <div class="step-time">⏱ 2 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>把 batch attention 改为从 block_table 读取 KV</li>
+            <li>处理变长：不同请求访问不同数量的 block</li>
+            <li>端到端测试：continuous batching + paged KV 一起跑</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># mini_infer/paged_attention.py</span>
+<span class="kw">def</span> <span class="fn">paged_attention_forward</span>(
+    q,                    <span class="com"># (B, num_heads, 1, head_dim) — 当前步 query</span>
+    block_tables,         <span class="com"># List[List[int]] — 每个请求的 block_table</span>
+    kv_pool,              <span class="com"># (num_blocks, 2, L, H_kv, block_size, head_dim)</span>
+    layer_idx,
+    block_size,
+    num_kv_heads,
+):
+    B = q.shape[<span class="num">0</span>]
+    outputs = []
+    <span class="kw">for</span> b <span class="kw">in</span> range(B):
+        <span class="com"># 收集该请求所有 block 的 KV</span>
+        blocks = block_tables[b]
+        ks = [kv_pool[bid, <span class="num">0</span>, layer_idx] <span class="kw">for</span> bid <span class="kw">in</span> blocks]  <span class="com"># each (H_kv, BS, HD)</span>
+        vs = [kv_pool[bid, <span class="num">1</span>, layer_idx] <span class="kw">for</span> bid <span class="kw">in</span> blocks]
+        K = torch.cat(ks, dim=<span class="num">1</span>)  <span class="com"># (H_kv, seq, head_dim)</span>
+        V = torch.cat(vs, dim=<span class="num">1</span>)
+
+        <span class="com"># GQA: repeat KV heads if needed</span>
+        <span class="kw">if</span> K.shape[<span class="num">0</span>] < q.shape[<span class="num">1</span>]:
+            n_rep = q.shape[<span class="num">1</span>] // K.shape[<span class="num">0</span>]
+            K = K.repeat_interleave(n_rep, dim=<span class="num">0</span>)
+            V = V.repeat_interleave(n_rep, dim=<span class="num">0</span>)
+
+        <span class="com"># Standard attention</span>
+        scores = torch.einsum(<span class="str">"hqd,hkd->hqk"</span>, q[b], K) / math.sqrt(q.shape[-<span class="num">1</span>])
+        attn = torch.softmax(scores, dim=-<span class="num">1</span>)
+        out = torch.einsum(<span class="str">"hqk,hkd->hqd"</span>, attn, V)
+        outputs.append(out)
+
+    <span class="kw">return</span> torch.stack(outputs, dim=<span class="num">0</span>)  <span class="com"># (B, num_heads, 1, head_dim)</span></div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>Continuous Batching + Paged KV 端到端跑通</li>
+              <li>输出正确性 100% 匹配</li>
+              <li>显存利用率 > <span class="metric">90%</span>（vs 连续分配的 ~50%）</li>
+              <li>支持并发数相比连续分配提升 <span class="metric">≥ 1.5×</span></li>
+              <li>结果保存为 <span class="metric">results/paged_kv.json</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ====== PHASE 4: Chunked Prefill =========== -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase4">
+      <div class="phase-header">
+        <div class="phase-num red">4</div>
+        <div class="phase-title">
+          <h2>Chunked Prefill（分块预填充）</h2>
+          <p>长 prompt 的 prefill 会阻塞 decode 请求。把 prefill 切成小块，和 decode 交错执行，降低尾延迟。</p>
+        </div>
+      </div>
+
+      <!-- Step 4.1 -->
+      <div class="step" id="p4s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">理解 Chunked Prefill 原理</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>理解 prefill 是 compute-bound，decode 是 memory-bound</li>
+            <li>理解长 prompt（如 8K token）一次性 prefill 会阻塞所有 decode 请求几百毫秒</li>
+            <li>理解 chunked prefill：把 prompt 切成 chunk_size=512 的块，每块之间让 decode 请求插队</li>
+          </ul>
+
+          <table class="tbl">
+            <tr><th>策略</th><th>TTFT (长 prompt)</th><th>Decode 延迟影响</th><th>GPU 利用率</th></tr>
+            <tr><td>无 chunk</td><td>低（一次算完）</td><td>严重阻塞</td><td>脉冲式</td></tr>
+            <tr><td>Chunked (512)</td><td>略高（分步）</td><td>几乎无影响</td><td>平稳</td></tr>
+          </table>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>能解释为什么 chunked prefill 牺牲了一点 TTFT 但大幅改善 decode 尾延迟</li>
+              <li>能画出 chunked prefill 和 decode 交错的 timeline</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4.2 -->
+      <div class="step" id="p4s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">实现 Chunked Prefill</div>
+          <div class="step-time">⏱ 2 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>改造 scheduler：prefill 请求按 chunk 分步处理</li>
+            <li>每个 iteration 先处理一个 chunk 的 prefill，再处理 decode</li>
+            <li>chunk 大小可配置（默认 512 或 1024）</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># 在 Scheduler.schedule() 中加入 chunked prefill 逻辑</span>
+<span class="kw">def</span> <span class="fn">schedule_chunked</span>(self, chunk_size=<span class="num">512</span>):
+    batch = []
+
+    <span class="com"># 1. 选一个 prefill 请求，只取一个 chunk</span>
+    <span class="kw">for</span> req <span class="kw">in</span> self.waiting:
+        <span class="kw">if</span> req.state == RequestState.WAITING:
+            remaining = len(req.prompt_ids) - req.num_prefilled
+            chunk = req.prompt_ids[req.num_prefilled : req.num_prefilled + chunk_size]
+            req.current_chunk = chunk
+            req.num_prefilled += len(chunk)
+            batch.append(req)
+
+            <span class="kw">if</span> req.num_prefilled >= len(req.prompt_ids):
+                req.state = RequestState.RUNNING  <span class="com"># prefill 完成</span>
+            <span class="kw">break</span>  <span class="com"># 每步只处理一个 prefill chunk</span>
+
+    <span class="com"># 2. 加入 decode 请求（如果还有容量）</span>
+    available = self.max_num_seqs - len(batch)
+    <span class="kw">for</span> req <span class="kw">in</span> self.running[:available]:
+        batch.append(req)
+
+    <span class="kw">return</span> batch</div>
+
+          <div class="code-block"><span class="com"># forward 时区分 prefill chunk 和 decode step</span>
+<span class="kw">def</span> <span class="fn">forward_batch</span>(model, batch, caches):
+    prefill_inputs = []
+    decode_inputs = []
+    prefill_reqs = []
+    decode_reqs = []
+
+    <span class="kw">for</span> req <span class="kw">in</span> batch:
+        <span class="kw">if</span> hasattr(req, <span class="str">'current_chunk'</span>) <span class="kw">and</span> req.current_chunk <span class="kw">is not</span> <span class="kw">None</span>:
+            prefill_inputs.append(req.current_chunk)
+            prefill_reqs.append(req)
+        <span class="kw">else</span>:
+            decode_inputs.append(req.output_ids[-<span class="num">1</span>])
+            decode_reqs.append(req)
+
+    outputs = []
+
+    <span class="com"># Prefill chunk: 正常前向，写入 KV cache</span>
+    <span class="kw">if</span> prefill_inputs:
+        chunk_tensor = torch.tensor(prefill_inputs[<span class="num">0</span>], device=<span class="str">"musa"</span>).unsqueeze(<span class="num">0</span>)
+        hidden = model.forward_prefill(chunk_tensor, layer_idx=<span class="num">0</span>)
+        <span class="com"># ... 逐层 forward，写入 cache</span>
+        <span class="com"># 只取最后一个 token 的 logits（用于采样下一个 chunk 的第一个 token）</span>
+
+    <span class="com"># Decode: 单 token 前向</span>
+    <span class="kw">if</span> decode_inputs:
+        decode_tensor = torch.stack([torch.tensor(t, device=<span class="str">"musa"</span>) <span class="kw">for</span> t <span class="kw">in</span> decode_inputs])
+        hidden = model.forward_decode(decode_tensor, caches, decode_reqs)
+        logits = model.lm_head(hidden)
+        outputs.extend(logits.argmax(dim=-<span class="num">1</span>).tolist())
+
+    <span class="kw">return</span> outputs</div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>长 prompt（4K+）的 prefill 不再阻塞 decode 请求</li>
+              <li>decode 请求的 TPOT 在 prefill 期间波动 <span class="metric">< 20%</span></li>
+              <li>输出正确性不变</li>
+              <li>对比有无 chunked 的 TTFT 和 decode 延迟曲线</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4.3 -->
+      <div class="step" id="p4s3">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">测试 TTFT & Decode 延迟改善</div>
+          <div class="step-time">⏱ 0.5 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>测试场景：1 个长 prompt (4K) + 8 个短请求并发</li>
+            <li>对比有无 chunked prefill 的 decode TPOT 曲线</li>
+            <li>找到最优 chunk_size（512 vs 1024 vs 2048）</li>
+          </ul>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>Decode 请求在长 prompt 期间的 TPOT 退化 <span class="metric">< 15%</span></li>
+              <li>找到当前硬件的最优 chunk_size</li>
+              <li>结果保存为 <span class="metric">results/chunked_prefill.json</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ====== PHASE 5: 吞吐对标 & 调优 ========== -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase5">
+      <div class="phase-header">
+        <div class="phase-num gold">5</div>
+        <div class="phase-title">
+          <h2>吞吐对标 HF Transformers & 性能调优</h2>
+          <p>用统一 benchmark 对比 mini-infer vs HF Transformers，定位瓶颈，调参逼近 80%+ 目标。</p>
+        </div>
+      </div>
+
+      <!-- Step 5.1 -->
+      <div class="step" id="p5s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">统一 Benchmark 对比</div>
+          <div class="step-time">⏱ 1 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>用同一组 100 条 prompt，分别跑 HF / mini-infer（各阶段）</li>
+            <li>记录 TTFT / TPOT / 总吞吐 / 显存 / GPU 利用率</li>
+            <li>汇总成对比表</li>
+          </ul>
+
+          <table class="tbl">
+            <tr><th>指标</th><th>HF Transformers</th><th>mini-infer (目标)</th><th>达成</th></tr>
+            <tr><td>单请求 decode tok/s</td><td>baseline</td><td>≥ baseline × 1.5</td><td>—</td></tr>
+            <tr><td>8 并发总吞吐</td><td>baseline</td><td>≥ baseline × 3.0</td><td>—</td></tr>
+            <tr><td>TTFT (p95, 2K prompt)</td><td>baseline</td><td>≤ baseline × 1.2</td><td>—</td></tr>
+            <tr><td>显存峰值</td><td>baseline</td><td>≤ baseline × 1.1</td><td>—</td></tr>
+            <tr><td>输出正确率</td><td>100%</td><td>100%</td><td>—</td></tr>
+          </table>
+
+          <div class="code-block"><span class="com"># benchmark_all.py</span>
+<span class="kw">import</span> json
+
+configs = [
+    (<span class="str">"HF-Transformers"</span>, benchmark_hf),
+    (<span class="str">"mini-infer-KV"</span>, benchmark_kv_only),
+    (<span class="str">"mini-infer-ContBatch"</span>, benchmark_continuous),
+    (<span class="str">"mini-infer-Paged"</span>, benchmark_paged),
+    (<span class="str">"mini-infer-Chunked"</span>, benchmark_chunked),
+]
+
+results = {}
+<span class="kw">for</span> name, func <span class="kw">in</span> configs:
+    print(<span class="str">f"Running {name}..."</span>)
+    r = func(prompts=<span class="num">100</span> prompts, max_new=<span class="num">256</span>)
+    results[name] = {
+        <span class="str">"mean_tpot_ms"</span>: statistics.mean(r.tpot_ms),
+        <span class="str">"p95_ttft_ms"</span>: percentile(r.ttft_ms, <span class="num">95</span>),
+        <span class="str">"total_tok_per_s"</span>: sum(r.num_tokens)/sum(r.elapsed),
+        <span class="str">"peak_mem_gb"</span>: max(r.peak_mem_gb),
+    }
+
+<span class="kw">with</span> open(<span class="str">"results/full_benchmark.json"</span>, <span class="str">"w"</span>) <span class="kw">as</span> f:
+    json.dump(results, f, indent=<span class="num">2</span>)
+
+<span class="com"># 打印对比表</span>
+print(<span class="str">"\n=== Benchmark Results ==="</span>)
+<span class="kw">for</span> name, r <span class="kw">in</span> results.items():
+    print(<span class="str">f"{name:25s}  TPOT={r['mean_tpot_ms']:8.1f}ms  TTFT_p95={r['p95_ttft_ms']:8.1f}ms  tok/s={r['total_tok_per_s']:8.1f}  mem={r['peak_mem_gb']:.1f}GB"</span>)</div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>mini-infer 总吞吐 ≥ HF baseline 的 <span class="metric">80%</span>（单请求 + 并发综合）</li>
+              <li>所有数据保存为 JSON + 可视化图表</li>
+              <li>写出一份 <span class="metric">benchmark_report.md</span> 分析报告</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5.2 -->
+      <div class="step" id="p5s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">性能剖析 & 瓶颈定位</div>
+          <div class="step-time">⏱ 1 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>用 torch.profiler 或 mthreads 自带 profiler 抓热点</li>
+            <li>定位瓶颈：是 attention 计算？KV cache 读写？还是 Python 调度开销？</li>
+            <li>针对性优化（合并 kernel、减少拷贝、预分配张量）</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># profile_engine.py</span>
+<span class="kw">from</span> torch.profiler <span class="kw">import</span> profile, ProfilerActivity
+
+<span class="kw">with</span> profile(
+    activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],  <span class="com"># MUSA 对应改</span>
+    record_shapes=<span class="kw">True</span>,
+    profile_memory=<span class="kw">True</span>,
+) <span class="kw">as</span> prof:
+    engine.run_benchmark(prompts, num_steps=<span class="num">100</span>)
+
+print(prof.key_averages().table(sort_by=<span class="str">"cuda_time_total"</span>, row_limit=<span class="num">20</span>))
+prof.export_chrome_trace(<span class="str">"results/trace.json"</span>)</div>
+
+          <div class="tip">
+            <strong>常见瓶颈 & 对策：</strong>
+            <br>• <strong>Python 循环开销</strong> → 合并为 batch 操作
+            <br>• <strong>KV cache 频繁 cat</strong> → 预分配 + 原地写入
+            <br>• <strong>RMSNorm 每步调用</strong> → 融合到前一层 kernel
+            <br>• <strong>采样串行</strong> → 一次 batch 采样
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>有完整的 profiler 火焰图 / trace</li>
+              <li>明确了 top 3 瓶颈函数</li>
+              <li>针对性优化后吞吐提升 <span class="metric">≥ 10%</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ====== PHASE 6: TileLang-MUSA Kernel ====== -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase6">
+      <div class="phase-header">
+        <div class="phase-num blue">6</div>
+        <div class="phase-title">
+          <h2>TileLang-MUSA Kernel 替换</h2>
+          <p>把 PyTorch 的 RMSNorm / dequant GEMM 替换为手写 TileLang-MUSA kernel，测带宽利用率，这是含金量最高的部分。</p>
+        </div>
+      </div>
+
+      <!-- Step 6.1 -->
+      <div class="step" id="p6s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">了解 TileLang-MUSA 环境 & 文档</div>
+          <div class="step-time">⏱ 1 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>找到 MUSA 的 TileLang / Triton-MUSA 安装路径和文档</li>
+            <li>跑通官方示例 kernel（如 vector_add、matmul）</li>
+            <li>确认编译器工具链（mtcc / clang-musa）</li>
+            <li>理解 MUSA 的 thread block / warp / SIMD 模型</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># 检查 TileLang / Triton-MUSA</span>
+python -c <span class="str">"import tilelang; print(tilelang.__version__)"</span>
+python -c <span class="str">"import triton; print(triton.__version__)"</span>
+
+<span class="com"># 查看 MUSA 架构参数（用于 kernel 调优）</span>
+mthreads-gmi --query-gpu=compute_capability,num_sm,max_block_per_sm
+<span class="com"># S5000: sm_90 级别, 先看实际输出</span></div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/</span><br>
+├── <span class="dir">kernel/</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">test_tilelang_env.py</span> <span class="comment"># 验证 TileLang 可用</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">vector_add.py</span> <span class="comment"># 第一个 kernel</span><br>
+│&nbsp;&nbsp;&nbsp;├── <span class="file">matmul.py</span> <span class="comment"># GEMM kernel</span><br>
+│&nbsp;&nbsp;&nbsp;└── <span class="file">rmsnorm.py</span> <span class="comment"># RMSNorm kernel（目标）</span>
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>TileLang-MUSA 环境可用，能编译运行 kernel</li>
+              <li>理解了 MUSA 的 grid/block/thread 层次</li>
+              <li>知道如何用 <span class="metric">torch.profiler</span> 或 <span class="metric">mthreads-gmi</span> 测带宽</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 6.2 -->
+      <div class="step" id="p6s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">编写 RMSNorm TileLang Kernel</div>
+          <div class="step-time">⏱ 3 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>RMSNorm 公式：<span class="metric">y = x / RMS(x) * γ</span>，其中 <span class="metric">RMS(x) = sqrt(mean(x²) + ε)</span></li>
+            <li>这是 memory-bound 操作（每字节读一次做平方，再读一次做归一化）</li>
+            <li>用 TileLang 写融合 kernel：一次遍历完成平方和 + 归一化 + 缩放</li>
+            <li>对比 PyTorch 原生 RMSNorm 的带宽利用率</li>
+          </ul>
+
+          <h4>🛠 PyTorch 参考实现（要替换掉的）</h4>
+          <div class="code-block"><span class="com"># 这是 PyTorch 版（慢路径）</span>
+<span class="kw">def</span> <span class="fn">rmsnorm_pytorch</span>(x, gamma, eps=<span class="num">1e-6</span>):
+    <span class="com"># x: (B, S, D)  gamma: (D,)</span>
+    rms = torch.sqrt(x.pow(<span class="num">2</span>).mean(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>) + eps)
+    <span class="kw">return</span> x / rms * gamma</div>
+
+          <h4>🛠 TileLang Kernel 骨架</h4>
+          <div class="code-block"><span class="com"># kernel/rmsnorm_tilelang.py</span>
+<span class="kw">import</span> tilelang
+<span class="kw">import</span> tilelang.language <span class="kw">as</span> T
+
+<span class="com"># RMSNorm 是 row-wise 操作：每行独立计算</span>
+<span class="com"># 关键优化：用 warp-level reduce 算 mean(x^2)，避免多次全局内存访问</span>
+
+<span class="kw">def</span> <span class="fn">rmsnorm_kernel</span>(B, S, D, eps=<span class="num">1e-6</span>):
+    <span class="com"># 每个 thread block 处理一行 (一个 token 的 D 维向量)</span>
+    <span class="com"># 或者一个 block 处理多行以提高 occupancy</span>
+
+    @tilelang.jit
+    <span class="kw">def</span> <span class="fn">kernel</span>(X: T.Tensor[(B, S, D), <span class="str">"float16"</span>],
+                   Gamma: T.Tensor[(D,), <span class="str">"float16"</span>],
+                   Y: T.Tensor[(B, S, D), <span class="str">"float16"</span>]):
+        <span class="kw">for</span> b, s <span class="kw">in</span> T.grid(B, S):
+            <span class="com"># Step 1: 计算 sum(x^2) — warp reduce</span>
+            local_sum = T.cast(<span class="num">0.0</span>, <span class="str">"float32"</span>)
+            <span class="kw">for</span> d <span class="kw">in</span> range(D):
+                val = T.cast(X[b, s, d], <span class="str">"float32"</span>)
+                local_sum += val * val
+
+            <span class="com"># Warp-level reduction (TileLang 内置)</span>
+            sum_sq = T.warp_reduce(local_sum, op=<span class="str">"sum"</span>)
+
+            <span class="com"># Step 2: 计算 RMS</span>
+            rms = T.sqrt(sum_sq / T.cast(D, <span class="str">"float32"</span>) + T.cast(eps, <span class="str">"float32"</span>))
+
+            <span class="com"># Step 3: 归一化 + 缩放</span>
+            <span class="kw">for</span> d <span class="kw">in</span> range(D):
+                Y[b, s, d] = T.cast(
+                    T.cast(X[b, s, d], <span class="str">"float32"</span>) / rms * T.cast(Gamma[d], <span class="str">"float32"</span>),
+                    <span class="str">"float16"</span>
+                )
+
+    <span class="kw">return</span> kernel
+
+<span class="com"># 编译 & 测试</span>
+B, S, D = <span class="num">2</span>, <span class="num">2048</span>, <span class="num">4096</span>  <span class="com"># Qwen3-8B hidden_size=4096</span>
+kernel = rmsnorm_kernel(B, S, D)
+x = torch.randn(B, S, D, dtype=torch.float16, device=<span class="str">"musa"</span>)
+gamma = torch.randn(D, dtype=torch.float16, device=<span class="str">"musa"</span>)
+y = kernel(x, gamma)</div>
+
+          <div class="warn">
+            <strong>注意：</strong>以上是 TileLang 的伪代码风格，实际 API 以摩尔线程官方文档为准。关键是理解 RMSNorm 的优化思路：
+            <br>1. <strong>减少全局内存访问次数</strong>（从 ~3 次降到 ~1 次）
+            <br>2. <strong>用 shared memory 做 warp reduce</strong>
+            <br>3. <strong>FP32 累加</strong>避免精度损失
+          </div>
+
+          <div class="file-tree">
+<span class="dir">~/mini-infer/kernel/</span><br>
+├── <span class="file">rmsnorm_tilelang.py</span> <span class="comment"># TileLang RMSNorm kernel</span><br>
+├── <span class="file">rmsnorm_triton.py</span> <span class="comment"># Triton-MUSA 备选实现</span><br>
+├── <span class="file">dequant_gemm.py</span> <span class="comment"># INT8 dequant GEMM (备选 kernel)</span><br>
+└── <span class="file">bench_kernel.py</span> <span class="comment"># 带宽测试脚本</span>
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>TileLang RMSNorm kernel 输出与 PyTorch 版误差 <span class="metric">< 1e-3</span>（FP16 精度）</li>
+              <li>带宽利用率 > <span class="metric">60%</span> 理论峰值（PyTorch 版通常 ~30%）</li>
+              <li>kernel 在 S5000 上编译通过并正确运行</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 6.3 -->
+      <div class="step" id="p6s3">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">替换 mini-infer 中的 PyTorch 路径 & 测带宽</div>
+          <div class="step-time">⏱ 1 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>把 mini-infer 模型中的 RMSNorm 调用替换为 TileLang kernel</li>
+            <li>端到端跑 benchmark，对比替换前后的吞吐和带宽</li>
+            <li>如果时间充裕，再加一个 INT8 dequant GEMM kernel</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># mini_infer/layers.py — 替换 RMSNorm</span>
+<span class="kw">class</span> <span class="fn">RMSNormTileLang</span>:
+    <span class="kw">def</span> __init__(self, hidden_size, eps=<span class="num">1e-6</span>):
+        self.gamma = torch.nn.Parameter(torch.ones(hidden_size, dtype=torch.float16))
+        self.eps = eps
+        self.kernel = rmsnorm_kernel(<span class="num">1</span>, <span class="num">1</span>, hidden_size)  <span class="com"># 动态编译</span>
+
+    <span class="kw">def</span> <span class="fn">__call__</span>(self, x):
+        <span class="kw">return</span> self.kernel(x, self.gamma)</div>
+
+          <div class="code-block"><span class="com"># kernel/bench_kernel.py — 带宽测试</span>
+<span class="kw">import</span> time
+
+<span class="kw">def</span> <span class="fn">measure_bandwidth</span>(func, *args, num_warmup=<span class="num">10</span>, num_iter=<span class="num">100</span>):
+    <span class="com"># Warmup</span>
+    <span class="kw">for</span> _ <span class="kw">in</span> range(num_warmup):
+        func(*args)
+    torch_musa.synchronize()
+
+    <span class="com"># Measure</span>
+    t0 = time.perf_counter()
+    <span class="kw">for</span> _ <span class="kw">in</span> range(num_iter):
+        func(*args)
+    torch_musa.synchronize()
+    elapsed = (time.perf_counter() - t0) / num_iter
+
+    <span class="com"># 计算带宽：读 X + 读 Gamma + 写 Y</span>
+    B, S, D = args[<span class="num">0</span>].shape
+    bytes_per_call = (B * S * D * <span class="num">2</span>) + (D * <span class="num">2</span>) + (B * S * D * <span class="num">2</span>)
+    bandwidth_gb_s = bytes_per_call / elapsed / <span class="num">1e9</span>
+    <span class="kw">return</span> bandwidth_gb_s
+
+<span class="com"># S5000 理论带宽约 800-900 GB/s (查实际规格)</span>
+pytorch_bw = measure_bandwidth(rmsnorm_pytorch, x, gamma)
+kernel_bw = measure_bandwidth(tilelang_kernel, x, gamma)
+print(<span class="str">f"PyTorch RMSNorm: {pytorch_bw:.1f} GB/s"</span>)
+print(<span class="str">f"TileLang RMSNorm: {kernel_bw:.1f} GB/s"</span>)
+print(<span class="str">f"Speedup: {kernel_bw/pytorch_bw:.2f}×"</span>)</div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>替换后端到端吞吐提升 <span class="metric">≥ 5%</span>（RMSNorm 占比不大但可测）</li>
+              <li>带宽利用率从 ~30% → <span class="metric">≥ 60%</span></li>
+              <li>写出 <span class="metric">kernel_report.md</span>：算法、tile size 选择、带宽曲线</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================= -->
+    <!-- ========== PHASE 7: vllm-musa PR ========== -->
+    <!-- ============================================= -->
+    <section class="phase" id="phase7">
+      <div class="phase-header">
+        <div class="phase-num green">7</div>
+        <div class="phase-title">
+          <h2>给 vllm-musa 提 PR</h2>
+          <p>把你在 mini-infer 中踩过的坑、修过的 bug、补的文档反馈到社区，完成从"用框架"到"改框架"的跨越。</p>
+        </div>
+      </div>
+
+      <!-- Step 7.1 -->
+      <div class="step" id="p7s1">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">阅读 vllm-musa 源码 & 找 Issue</div>
+          <div class="step-time">⏱ 1 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>clone vllm-musa 仓库，浏览目录结构</li>
+            <li>重点看 <span class="metric">vllm_musa/</span> 下的 MUSA 后端实现</li>
+            <li>去 GitHub Issues 找 <strong>good first issue</strong> 或文档类 issue</li>
+            <li>也可以提你自己在 mini-infer 中发现的 MUSA 兼容性问题</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># 克隆仓库</span>
+git clone https://github.com/MooreThreads/vllm-musa.git
+cd vllm-musa
+git checkout -b doc/fix-qwen3-readme
+
+<span class="com"># 浏览关键目录</span>
+ls vllm_musa/
+<span class="com"># attention/  — MUSA attention kernel</span>
+<span class="com"># comm/      — 通信原语 (all-reduce 等)</span>
+<span class="com"># ops/       — 自定义算子</span>
+<span class="com"># model_runner.py — 模型执行逻辑</span></div>
+
+          <table class="tbl">
+            <tr><th>PR 类型</th><th>难度</th><th>示例</th></tr>
+            <tr><td>文档修复</td><td>★☆☆</td><td>补 Qwen3 的 rope scaling 说明</td></tr>
+            <tr><td>Bugfix</td><td>★★☆</td><td>修复 MUSA 后端 dtype 断言错误</td></tr>
+            <tr><td>新模型支持</td><td>★★★</td><td>添加 Qwen3-Next 架构</td></tr>
+            <tr><td>Kernel 优化</td><td>★★★★</td><td>优化 paged attention kernel</td></tr>
+          </table>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>读完 vllm-musa 的核心数据流（从请求到 forward 到输出）</li>
+              <li>找到一个可以贡献的 issue（文档/Bug 均可）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 7.2 -->
+      <div class="step" id="p7s2">
+        <div class="step-header">
+          <div class="step-check" onclick="toggleCheck(this)"></div>
+          <div class="step-title">提交 PR & 跟进</div>
+          <div class="step-time">⏱ 1-2 天</div>
+        </div>
+        <div class="step-body">
+          <h4>📌 要做什么</h4>
+          <ul>
+            <li>写代码 + 测试 + 更新文档</li>
+            <li>提交 PR，写清晰的 description（动机 + 改动 + 测试结果）</li>
+            <li>回应 reviewer 的 feedback</li>
+          </ul>
+
+          <div class="code-block"><span class="com"># PR 提交流程</span>
+git add .
+git commit -m <span class="str">"docs: add Qwen3-8B deployment guide for MUSA S5000"</span>
+git push origin doc/fix-qwen3-readme
+
+<span class="com"># PR Description 模板</span>
+<span class="str">"""
+## Summary
+- 补充 Qwen3-8B 在 MUSA S5000 上的部署文档
+- 包含 KV Cache 量化参数建议
+- 补充已知问题：RoPE scaling 在 >4K 时的行为
+
+## Test Plan
+- [x] 在 S5000 上验证 Qwen3-8B FP16 推理
+- [x] 验证 INT8 量化后 PPL 退化 < 1%
+- [x] 文档链接可正常访问
+
+## Related Issues
+Closes #XXX
+"""</span></div>
+
+          <div class="tip">
+            <strong>PR 建议：</strong>第一份 PR 建议从 <strong>文档类</strong> 开始（门槛低、合入快、建立信任），后续再提 Bugfix 或 Feature。你在 mini-infer 中踩的坑就是最好的文档素材。
+          </div>
+
+          <div class="acceptance">
+            <h4>✅ 验收标准</h4>
+            <ul>
+              <li>PR 已提交到 vllm-musa 仓库（merged 或 under review 均可）</li>
+              <li>PR description 包含动机、改动说明、测试结果</li>
+              <li>截图/链接保存到 <span class="metric">results/pr_link.txt</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 最终交付物清单 ===== -->
+    <section class="phase" id="deliverables">
+      <div class="phase-header">
+        <div class="phase-num gold">✓</div>
+        <div class="phase-title">
+          <h2>最终交付物清单</h2>
+          <p>项目完成时你应该能拿出以下东西——这就是你的"作品集"。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-body">
+          <table class="tbl">
+            <tr><th>交付物</th><th>说明</th><th>含金量</th></tr>
+            <tr><td>mini-infer GitHub Repo</td><td>完整代码 + README + benchmark 脚本</td><td>⭐⭐⭐⭐⭐</td></tr>
+            <tr><td>benchmark_report.md</td><td>各阶段吞吐/延迟/显存对比表 + 图表</td><td>⭐⭐⭐⭐</td></tr>
+            <tr><td>kernel_report.md</td><td>TileLang RMSNorm 设计 + 带宽数据</td><td>⭐⭐⭐⭐⭐</td></tr>
+            <tr><td>vllm-musa PR 链接</td><td>已 merged 或 under review 的 PR</td><td>⭐⭐⭐⭐</td></tr>
+            <tr><td>技术博客 1-2 篇</td><td>写清楚你踩的坑和解决方案</td><td>⭐⭐⭐⭐</td></tr>
+            <tr><td>演示视频</td><td>5 分钟展示 mini-infer 跑 Qwen3-8B</td><td>⭐⭐⭐</td></tr>
+          </table>
+
+          <div class="tip">
+            <strong>简历写法示例：</strong><br>
+            "从零实现了一个支持 KV Cache、Continuous Batching、PagedAttention 的 LLM 推理引擎，在 MUSA S5000 上跑通 Qwen3-8B，吞吐对标 HF Transformers 85%+。用 TileLang-MUSA 手写 RMSNorm kernel，带宽利用率从 30% 提升至 65%。向 vllm-musa 提交 PR 修复文档/算子问题。"
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 底部 ===== -->
+    <div class="footer">
+      <p>Mini-Infer Project TODO · MUSA + Qwen3-8B · 2026</p>
+      <p style="margin-top:8px; font-size:12px;">建议每天 commit 一次进度，定期 push 到 GitHub，让贡献记录可见。</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ==================== FAB ==================== -->
+<div class="check-all-bar">
+  <div class="fab-label" id="fabLabel">点击 ✓ 标记完成</div>
+  <button class="fab" onclick="resetAll()" title="重置所有进度">⟲</button>
+</div>
+
+<!-- ==================== JS ==================== -->
+<script>
+// ========== 复选框状态管理 ==========
+const STORAGE_KEY = 'mini_infer_todo_progress';
+
+function getAllChecks() {
+  return document.querySelectorAll('.step-check');
+}
+
+function getProgress() {
+  const checks = getAllChecks();
+  const checked = document.querySelectorAll('.step-check.checked');
+  return { done: checked.length, total: checks.length };
+}
+
+function updateProgress() {
+  const { done, total } = getProgress();
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${done} / ${total} 步骤完成`;
+  document.getElementById('progressPct').textContent = pct + '%';
+
+  // 更新导航状态
+  document.querySelectorAll('.nav-item').forEach(nav => {
+    const target = nav.dataset.target;
+    if (!target) return;
+    const phaseSteps = document.querySelectorAll(`#${target} .step-check`);
+    const phaseChecked = document.querySelectorAll(`#${target} .step-check.checked`);
+    if (phaseSteps.length > 0 && phaseChecked.length === phaseSteps.length) {
+      nav.classList.add('done');
+    } else {
+      nav.classList.remove('done');
+    }
+  });
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  saveProgress();
+  updateProgress();
+}
+
+function saveProgress() {
+  const checks = getAllChecks();
+  const state = Array.from(checks).map(c => c.classList.contains('checked'));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadProgress() {
+  try {
+    const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const checks = getAllChecks();
+    state.forEach((checked, i) => {
+      if (checked && checks[i]) checks[i].classList.add('checked');
+    });
+    updateProgress();
+  } catch(e) {}
+}
+
+function resetAll() {
+  if (!confirm('确定要重置所有进度吗？')) return;
+  getAllChecks().forEach(c => c.classList.remove('checked'));
+  localStorage.removeItem(STORAGE_KEY);
+  updateProgress();
+}
+
+// ========== 目录导航高亮 ==========
+const observerOptions = {
+  root: null,
+  rootMargin: '-80px 0px -60% 0px',
+  threshold: 0
+};
+
+const phaseSections = document.querySelectorAll('.phase[id]');
+
+const navObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      document.querySelectorAll('.nav-item').forEach(nav => {
+        nav.classList.toggle('active', nav.dataset.target === id);
+      });
+    }
+  });
+}, observerOptions);
+
+phaseSections.forEach(sec => navObserver.observe(sec));
+
+// 点击导航滚动
+document.querySelectorAll('.nav-item').forEach(nav => {
+  nav.addEventListener('click', () => {
+    const target = nav.dataset.target;
+    if (target) {
+      document.getElementById(target).scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+});
+
+// ========== 初始化 ==========
+loadProgress();
+</script>
+
+</body>
+</html>
