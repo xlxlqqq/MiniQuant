@@ -1,3 +1,5 @@
+# python -m MiniQuant.examples.compare_tensor_channel
+
 import torch
 
 from MiniQuant.quant.affine import (
