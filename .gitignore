@@ -1,0 +1,9 @@
+# Python bytecode cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# local test cache
+.pytest_cache/
