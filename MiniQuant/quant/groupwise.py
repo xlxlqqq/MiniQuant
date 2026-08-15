@@ -85,25 +85,24 @@ def symmetric_dequantize_groupwise_int8(
 ) -> torch.Tensor:
 
     out_features, in_features = qtensor.q.shape
-
     group_size = qtensor.group_size
 
-    num_groups = (
-        in_features // group_size
-    )
+    num_groups = in_features // group_size
 
+    # reshape 成 (OC, groups, group_size)
     q_grouped = qtensor.q.reshape(
         out_features,
         num_groups,
         group_size,
     )
 
-    scale = qtensor.scale.unsqueeze(-1)
+    # scale: [OC, groups] -> [OC, groups, 1]
+    scale = qtensor.scale.unsqueeze(-1).float()
 
-    x_grouped = (
-        q_grouped.float() * scale
-    )
+    # symmetric: 没有 zero_point
+    x_grouped = q_grouped.float() * scale
 
+    # 恢复原始 shape
     return x_grouped.reshape(
         out_features,
         in_features,

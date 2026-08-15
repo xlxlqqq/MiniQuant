@@ -19,13 +19,16 @@ def test_quantized_linear_shape():
 def test_quantized_linear_close_to_fp():
     torch.manual_seed(42)
 
-    layer = QuantizedLinear(in_features=16, out_features=32)
+    layer = QuantizedLinear(in_features=16 * 128, out_features=32)
 
-    x = torch.randn(8, 16)
+    x = torch.randn(32, 16 * 128)
 
     y_fp = F.linear(x, layer.weight, layer.bias)
 
-    layer.quantize_weight_per_tensor()
+    # 三种方法任意选择
+    # layer.quantize_weight_per_tensor()
+    layer.quantize_weight_groupwise()
+    # layer.quantize_weight_per_channel()
 
     y_q = layer(x)
 

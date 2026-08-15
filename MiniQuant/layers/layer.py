@@ -13,6 +13,12 @@ from MiniQuant.quant.per_channel import (
     symmetric_dequantize_per_channel_int8,
 )
 
+from MiniQuant.quant.groupwise import (
+    symmetric_dequantize_groupwise_int8,
+    symmetric_quantize_groupwise_int8,
+    GroupwiseQuantizedTensor,
+)
+
 
 class QuantizedLinear(nn.Module):
     def __init__(
@@ -65,9 +71,22 @@ class QuantizedLinear(nn.Module):
     
     # per channel 量化
     def quantize_weight_per_channel(self):
-        self.weight_q_channel = (
+        self.weight_q = (
             symmetric_quantize_per_channel_int8(
                 self.weight.detach(),
+                channel_dim=0,
+            )
+        )
+
+    # group wise quant
+    def quantize_weight_groupwise(
+        self,
+        group_size: int = 128,
+    ):
+        self.weight_q = (
+            symmetric_quantize_groupwise_int8(
+                self.weight.detach(),
+                group_size=group_size,
                 channel_dim=0,
             )
         )
@@ -77,8 +96,13 @@ class QuantizedLinear(nn.Module):
             raise RuntimeError(
                 "Weight has not been quantized. Call quantize_weight() before forward()."
             )
-        
-        weight = symmetric_dequantize_int8(self.weight_q)
+
+        if isinstance(self.weight_q, GroupwiseQuantizedTensor):
+            weight = symmetric_dequantize_groupwise_int8(self.weight_q)
+        elif isinstance(self.weight_q, PerChannelQuantizedTensor):
+            weight = symmetric_dequantize_per_channel_int8(self.weight_q)
+        else:
+            weight = symmetric_dequantize_int8(self.weight_q)
 
         return torch.nn.functional.linear(
             x,
