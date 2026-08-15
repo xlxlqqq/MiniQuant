@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from miniquant.quant.affine import (
+from MiniQuant.quant.affine import (
     symmetric_quantize_int8, 
     symmetric_dequantize_int8,
     QuantizedTensor,
@@ -39,7 +39,7 @@ class QuantizedLinear(nn.Module):
         self.reset_parameters()
 
         # 量化后的权重参数，初始为 None
-        self.weight_quantized: QuantizedTensor | None = None
+        self.weight_q: QuantizedTensor | None = None
     
     def reset_parameters(self):
         nn.init.kaiming_uniform_(
