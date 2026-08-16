@@ -3,6 +3,8 @@ import torch
 from MiniQuant.quant.int4 import (
     quantize_groupwise_int4,
     dequantize_groupwise_int4,
+    pack_int4,
+    unpack_int4,
 )
 
 
@@ -104,3 +106,44 @@ def test_invalid_group_size():
     raise AssertionError(
         "Expected ValueError"
     )
+
+def test_pack_unpack():
+
+    q = torch.tensor(
+        [
+            -7,
+            -3,
+            -1,
+            0,
+            1,
+            3,
+            6,
+            7,
+        ],
+        dtype=torch.int8,
+    )
+
+    packed = pack_int4(q)
+
+    unpacked = unpack_int4(
+        packed,
+        num_values=q.numel(),
+    )
+
+    assert torch.equal(
+        q,
+        unpacked,
+    )
+
+def test_pack_size():
+
+    q = torch.randint(
+        -7,
+        8,
+        (1024,),
+        dtype=torch.int8,
+    )
+
+    packed = pack_int4(q)
+
+    assert packed.numel() == 512

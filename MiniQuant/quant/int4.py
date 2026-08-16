@@ -111,3 +111,88 @@ def dequantize_groupwise_int4(
         out_features,
         in_features,
     )
+
+# 范围从 [-7, 7] 映射到 [1, 15]
+def encode_int4(
+    q: torch.Tensor,
+) -> torch.Tensor:
+
+    if q.dtype != torch.int8:
+        raise TypeError(
+            "q must be int8"
+        )
+
+    if q.min() < -7 or q.max() > 7:
+        raise ValueError(
+            "q must be in [-7, 7]"
+        )
+
+    return (q + 8).to(torch.uint8)
+
+# 范围从 [1, 15] 映射到 [-7, 7]
+def decode_int4(
+    encoded: torch.Tensor,
+) -> torch.Tensor:
+
+    if encoded.dtype != torch.uint8:
+        raise TypeError(
+            "encoded must be uint8"
+        )
+
+    if encoded.min() < 1 or encoded.max() > 15:
+        raise ValueError(
+            "encoded must be in [1, 15]"
+        )
+
+    return encoded.to(torch.int16) - 8
+
+# 两个 int4 占用一个byte
+# 
+def pack_int4(q: torch.Tensor) -> torch.Tensor:
+    if q.dtype != torch.int8:
+        raise TypeError("q must be int8")
+    
+    if q.numel() % 2 != 0:
+        raise ValueError("Number of Int 4 values must be even.")
+
+    encoded = encode_int4(q)
+
+    flat = encoded.reshape(-1)
+
+    # 隔两个取数，从0开始
+    low = flat[0::2]
+    # 隔两个取数，从1开始
+    high = flat[1::2]
+
+    packed = (low | (high << 4))
+
+    return packed
+
+# unpack
+def unpack_int4(
+    packed: torch.Tensor,
+    num_values: int,
+) -> torch.Tensor:
+
+    if packed.dtype != torch.uint8:
+        raise TypeError(
+            "packed must be uint8"
+        )
+
+    low = packed & 0x0F
+    high = (packed >> 4) & 0x0F
+
+    encoded = torch.empty(
+        packed.numel() * 2,
+        dtype=torch.uint8,
+        device=packed.device,
+    )
+
+    encoded[0::2] = low
+    encoded[1::2] = high
+
+    encoded = encoded[:num_values]
+
+    return decode_int4(
+        encoded
+    ).to(torch.int8)
