@@ -19,3 +19,19 @@ def relative_error(x: torch.Tensor, y: torch.Tensor, eps: float = 1e-12) -> floa
     denominator = torch.norm(x).clamp_min(eps)
 
     return (nuerator / denominator).item()
+
+# l2 error
+def relative_l2_error(
+    x,
+    y,
+):
+
+    numerator = torch.norm(
+        x - y
+    )
+
+    denominator = torch.norm(x)
+
+    return (
+        numerator / denominator
+    ).item()
