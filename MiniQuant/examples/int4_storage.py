@@ -34,7 +34,6 @@ def calculate_storage(num_weights: int, group_size: int):
 def format_mb(value):
     return f"{value / 1024**2:.2f} MB"
 
-
 def report(num_weights, group_size):
     stats = calculate_storage(num_weights, group_size)
     print(
