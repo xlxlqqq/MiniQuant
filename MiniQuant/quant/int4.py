@@ -196,3 +196,19 @@ def unpack_int4(
     return decode_int4(
         encoded
     ).to(torch.int8)
+
+# 使用int4 packed 和 group wise进行量化
+def quantize_groupwise_int4_packed(
+    x: torch.Tensor,
+    group_size: int = 128,
+):
+    qtensor = quantize_groupwise_int4(
+        x,
+        group_size=group_size,
+    )
+
+    packed = pack_int4(
+        qtensor.q
+    )
+
+    return packed, qtensor.scale
